@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>にゃーん</title>
+  <style>
+    body {
+      height: 100vh;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #f8f8f8;
+    }
+    .center-container {
+      position: relative;
+      display: inline-block;
+      text-align: center;
+    }
+    .nyan-text {
+      display: block;
+      margin-bottom: 24px;
+      font-size: 4.5rem;
+      white-space: nowrap;
+      font-weight: bold;
+      color: #ff66cc;
+      text-shadow: 2px 2px 6px #fff, 1px 1px 2px #333;
+      pointer-events: none;
+      user-select: none;
+      font-family: "Noto Sans JP", "Yu Gothic", "Meiryo", "Hiragino Kaku Gothic ProN", "MS PGothic", Arial, Helvetica, sans-serif;
+      text-align: center;
+    }
+    .nyan-img {
+      display: block;
+      max-width: 350px;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="center-container">
+    <div class="nyan-text">にゃーん</div>
+    <img class="nyan-img" src="neko.png" alt="ねこのイラスト">
+  </div>
+</body>
+</html>
