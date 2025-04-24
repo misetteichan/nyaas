@@ -145,6 +145,11 @@
         resizeCanvas();
         // 画像ロード済みなら物理オブジェクトの位置もリセット
         if (nekoImgLoaded) restart();
+        // 通常猫モードなら中央に戻す
+        if (!window.catIsWild && catCollider) {
+          Body.setPosition(catCollider, { x: canvas.width/2, y: canvas.height/2 });
+          Body.setVelocity(catCollider, { x: 0, y: 0 });
+        }
       });
 
       const engine = Engine.create();
@@ -179,6 +184,9 @@
       function setupBodies() {
         width = canvas.width;
         height = canvas.height;
+        // 直前のcatColliderの位置・速度を保存
+        const prevPos = catCollider?.position ? { x: catCollider.position.x, y: catCollider.position.y } : null;
+        const prevVel = catCollider?.velocity ? { x: catCollider.velocity.x, y: catCollider.velocity.y } : null;
         World.clear(world, false);
         // 猫画像のサイズ（幅は高さ×アスペクト比）
         let nekoH = Math.max(200, height*0.28) * nekoScale;
@@ -196,13 +204,27 @@
           ellipseVertices.push({ x, y });
         }
         catCollider = Bodies.fromVertices(width/2, height/2, [ellipseVertices], {
-          isStatic: true, label: 'catCollider'
+          isStatic: !window.catIsWild,
+          label: 'catCollider',
+          restitution: window.catIsWild ? 1.4 : 0.2,
+          friction: 0.1
         }, true);
+        // 直前の位置・速度を復元
+        if (prevPos) Body.setPosition(catCollider, prevPos);
+        if (prevVel) Body.setVelocity(catCollider, prevVel);
+        // 暴れ猫モードならランダム初速
+        if (window.catIsWild) {
+          let vx = (Math.random() - 0.5) * 48;
+          let vy = (Math.random() - 0.5) * 48;
+          if (isNaN(vx)) vx = 0;
+          if (isNaN(vy)) vy = 0;
+          Body.setVelocity(catCollider, { x: vx, y: vy });
+        }
         // catColliderRadiusX, catColliderRadiusYをグローバルにもセット
         window.catColliderRadiusX = catColliderRadiusX;
         window.catColliderRadiusY = catColliderRadiusY;
         // 壁・地面
-        ground = Bodies.rectangle(width/2, height + 1000, width, 2000, { isStatic: true, restitution: 0.2, label: 'ground' });
+        ground = Bodies.rectangle(width/2, height + 1000, width, 2000, { isStatic: true, restitution: 1.0, label: 'ground' });
         const wallThickness = 100;
         const leftWall = Bodies.rectangle(-wallThickness/2, height/2, wallThickness, height*2, { isStatic: true, restitution: 0.2, label: 'leftWall' });
         const rightWall = Bodies.rectangle(width + wallThickness/2, height/2, wallThickness, height*2, { isStatic: true, restitution: 0.2, label: 'rightWall' });
@@ -214,6 +236,27 @@
           World.add(world, nyansToAdd);
         }
       }
+
+      // 暴れ猫モードON関数
+      function unleashCat() {
+        window.catIsWild = true;
+        setupBodies();
+
+      }
+      function resetCatMode() {
+        window.catIsWild = false;
+        setupBodies();
+        // 猫を中央に戻して完全停止
+        if (catCollider) {
+          Body.setPosition(catCollider, { x: canvas.width/2, y: canvas.height/2 });
+          Body.setVelocity(catCollider, { x: 0, y: 0 });
+        }
+
+      }
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') unleashCat();
+        if (e.key === 'Escape') resetCatMode();
+      });
 
       // 新しいにゃーんを生成して追加する関数
       function addNyan() {
@@ -339,19 +382,19 @@
         if (!nekoImgLoaded || !ground) return;
         // 個別重力を毎フレーム適用
         applyCustomGravity();
-        // ねこ（アスペクト比維持＆中央）
+        // ねこ（物理ボディcatColliderに追従して描画）
         ctx.save();
-        // 猫画像はcanvas中央に表示（物理ボディに依存しない）
         let nekoDrawH = Math.max(200, canvas.height*0.28) * nekoScale;
         let nekoDrawW = nekoDrawH * (nekoImg.naturalWidth / nekoImg.naturalHeight);
-        ctx.translate(canvas.width/2, canvas.height/2);
-        ctx.drawImage(
-          nekoImg,
-          -nekoDrawW/2,
-          -nekoDrawH/2,
-          nekoDrawW,
-          nekoDrawH
-        );
+        if (catCollider && catCollider.position) {
+          ctx.drawImage(
+            nekoImg,
+            catCollider.position.x - nekoDrawW/2,
+            catCollider.position.y - nekoDrawH/2,
+            nekoDrawW,
+            nekoDrawH
+          );
+        }
         ctx.restore();
         // デバッグ用: 猫の当たり判定（青ポリゴン/楕円）を描画
         if (window.showColliderDebug && catCollider) {
