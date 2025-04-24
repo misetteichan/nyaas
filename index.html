@@ -253,20 +253,32 @@
         }
 
       }
+      // --- 共通: 暴れ猫モード切り替え ---
+      function triggerWildCatMode() {
+        unleashCat();
+      }
+      // --- 共通: 通常猫モード（再スタート） ---
+      function triggerNormalCatMode() {
+        resetCatMode();
+      }
+
       window.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') unleashCat();
-        if (e.key === 'Escape') resetCatMode();
+        if (e.key === 'Enter') triggerWildCatMode();
+        if (e.key === 'Escape') triggerNormalCatMode();
       });
 
-      // --- スマホ操作用: 長押しで再スタート ---
+      // --- スマホ操作用: 長押しで再スタート、2本指タップで暴れ猫 ---
       let longPressTimer = null;
       const LONG_PRESS_THRESHOLD = 600; // ms
       canvas.addEventListener('touchstart', (e) => {
         if (e.touches.length === 1) {
           longPressTimer = setTimeout(() => {
             longPressTimer = null;
-            resetCatMode();
+            triggerNormalCatMode();
           }, LONG_PRESS_THRESHOLD);
+        }
+        if (e.touches.length === 2) {
+          triggerWildCatMode();
         }
       });
       canvas.addEventListener('touchend', (e) => {
