@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@900&display=swap" rel="stylesheet">
   <meta charset="UTF-8">
-  <title>にゃーん</title>
+  <title>NyaaS</title>
   <style>
     body {
       height: 100vh;
@@ -27,7 +28,8 @@
       text-shadow: 2px 2px 6px #fff, 1px 1px 2px #333;
       pointer-events: none;
       user-select: none;
-      font-family: "Noto Sans JP", "Yu Gothic", "Meiryo", "Hiragino Kaku Gothic ProN", "MS PGothic", Arial, Helvetica, sans-serif;
+      font-family: 'M PLUS Rounded 1c', 'Kosugi Maru', 'Noto Sans JP', "Yu Gothic", "Meiryo", "Hiragino Kaku Gothic ProN", "MS PGothic", Arial, Helvetica, sans-serif;
+      font-weight: 900;
       text-align: center;
     }
     .nyan-img {
@@ -35,12 +37,117 @@
       max-width: 350px;
       height: auto;
     }
+    @keyframes nyanDrop {
+      0% {
+        transform: translateY(-100vh);
+        opacity: 0;
+      }
+      60% {
+        transform: translateY(0);
+        opacity: 1;
+      }
+      75% {
+        transform: translateY(-48px);
+      }
+      85% {
+        transform: translateY(0);
+      }
+      92% {
+        transform: translateY(-20px);
+      }
+      100% {
+        transform: translateY(0);
+      }
+    }
+    .nyan-drop-anim {
+      animation: nyanDrop 0.8s ease-in;
+    }
+    @keyframes nekoBounce {
+      0%, 60% {
+        transform: translateY(0);
+      }
+      75% {
+        transform: translateY(-36px);
+      }
+      85% {
+        transform: translateY(0);
+      }
+      92% {
+        transform: translateY(-14px);
+      }
+      100% {
+        transform: translateY(0);
+      }
+    }
+    .neko-bounce-anim {
+      animation: nekoBounce 0.8s ease-in;
+    }
+    .footer-nyas {
+      position: fixed;
+      right: 0;
+      bottom: 0;
+      width: auto;
+      text-align: right;
+      font-size: 0.93rem;
+      font-family: 'Yu Gothic', 'Meiryo', 'Noto Sans JP', Arial, Helvetica, sans-serif;
+      color: #222;
+      background: none;
+      letter-spacing: 0.05em;
+      padding: 4px 18px 2px 8px;
+      z-index: 100;
+      font-weight: normal;
+    }
+    @keyframes footerBounce {
+      0%, 60% {
+        transform: translateY(0);
+      }
+      75% {
+        transform: translateY(-24px);
+      }
+      85% {
+        transform: translateY(0);
+      }
+      92% {
+        transform: translateY(-10px);
+      }
+      100% {
+        transform: translateY(0);
+      }
+    }
+    .footer-bounce-anim {
+      animation: footerBounce 0.8s ease-in;
+    }
   </style>
 </head>
 <body>
   <div class="center-container">
-    <div class="nyan-text">にゃーん</div>
-    <img class="nyan-img" src="neko.png" alt="ねこのイラスト">
+    <div class="nyan-text" id="nyan-text">にゃーん</div>
+    <img class="nyan-img" id="nyan-img" src="neko.png" alt="みせっていにゃん">
   </div>
+  <script>
+    function startNyanAnimation() {
+      const nyan = document.getElementById('nyan-text');
+      const neko = document.getElementById('nyan-img');
+      nyan.classList.remove('nyan-drop-anim');
+      neko.classList.remove('neko-bounce-anim');
+      document.getElementById('footer-nyas').classList.remove('footer-bounce-anim');
+      // 再付与のために少し待つ
+      setTimeout(() => {
+        nyan.classList.add('nyan-drop-anim');
+        neko.classList.add('neko-bounce-anim');
+        document.getElementById('footer-nyas').classList.add('footer-bounce-anim');
+      }, 10);
+    }
+    window.addEventListener('DOMContentLoaded', function() {
+      startNyanAnimation();
+      window.addEventListener('keydown', function() {
+        startNyanAnimation();
+      });
+      window.addEventListener('pointerdown', function() {
+        startNyanAnimation();
+      });
+    });
+  </script>
+  <div class="footer-nyas" id="footer-nyas">NyaaS - にゃーん as a Service</div>
 </body>
 </html>
