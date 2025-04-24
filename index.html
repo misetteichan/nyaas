@@ -258,6 +258,24 @@
         if (e.key === 'Escape') resetCatMode();
       });
 
+      // --- スマホ操作用: 長押しで再スタート ---
+      let longPressTimer = null;
+      const LONG_PRESS_THRESHOLD = 600; // ms
+      canvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          longPressTimer = setTimeout(() => {
+            longPressTimer = null;
+            resetCatMode();
+          }, LONG_PRESS_THRESHOLD);
+        }
+      });
+      canvas.addEventListener('touchend', (e) => {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      });
+
       // 新しいにゃーんを生成して追加する関数
       function addNyan() {
         const nyanColors = ['#ff66cc', '#66ccff', '#ffd700', '#ff9966', '#90ee90', '#ff4444', '#a066ff'];
