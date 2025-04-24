@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
   <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/matter-js@0.19.0/build/matter.min.js"></script>
   <meta charset="UTF-8">
   <title>NyaaS</title>
   <style>
@@ -121,32 +122,329 @@
 </head>
 <body>
   <div class="center-container">
-    <div class="nyan-text" id="nyan-text">にゃーん</div>
-    <img class="nyan-img" id="nyan-img" src="neko.png" alt="みせっていにゃん">
+    <canvas id="nyan-canvas" style="display:block;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:1;background:transparent;"></canvas>
   </div>
   <script>
-    function startNyanAnimation() {
-      const nyan = document.getElementById('nyan-text');
-      const neko = document.getElementById('nyan-img');
-      nyan.classList.remove('nyan-drop-anim');
-      neko.classList.remove('neko-bounce-anim');
-      document.getElementById('footer-nyas').classList.remove('footer-bounce-anim');
-      // 再付与のために少し待つ
-      setTimeout(() => {
-        nyan.classList.add('nyan-drop-anim');
-        neko.classList.add('neko-bounce-anim');
-        document.getElementById('footer-nyas').classList.add('footer-bounce-anim');
-      }, 10);
+    // Matter.jsを使って物理演算で「にゃーん」と「ねこ」を動かす
+    const { Engine, Render, Runner, World, Bodies, Body, Events } = window.Matter;
+
+    function startPhysics() {
+
+      const canvas = document.getElementById('nyan-canvas');
+      // ここでまとめて宣言
+      let nekoAspect = 1.5;
+      let nekoImgLoaded = false;
+      let ground, neko, nyan;
+      let width, height;
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      resizeCanvas();
+      window.addEventListener('resize', () => {
+        resizeCanvas();
+        // 画像ロード済みなら物理オブジェクトの位置もリセット
+        if (nekoImgLoaded) restart();
+      });
+
+      const engine = Engine.create();
+      const world = engine.world;
+      // 重力を強くして落下速度アップ
+      engine.world.gravity.y = 5.0;
+
+      // 物理オブジェクトをグローバルで持つ
+      // （宣言はstartPhysics()の最初に1回だけ！）
+
+      // すべてのnyanに個別重力を適用する
+      function applyCustomGravity() {
+        if (!window.allNyans) return;
+        for (const n of window.allNyans) {
+          if (!n.position || !n.customGravity) continue;
+          // デフォルト重力との差分だけ加算
+          const baseGravity = engine.world.gravity.y;
+          const diff = (n.customGravity - 1) * baseGravity;
+          Body.applyForce(n, n.position, { x: 0, y: n.mass * diff * 0.001 });
+        }
+      }
+
+      // 猫画像・当たり判定の拡大倍率（グローバルで共通利用）
+      let nekoScale = 1.5;
+      // デバッグ用: 当たり判定の可視化フラグ（猫・にゃーん共通）
+      window.showColliderDebug = window.showColliderDebug ?? false;
+      // 当たり判定（物理ボディ）用の変数
+      let catCollider, catColliderRadiusX, catColliderRadiusY;
+
+      // SVGパス→Matter.js頂点変換関数を読み込み
+      // ※本番ではimport/requireだが、ブラウザ用にwindow.svgPathToVertices想定
+      function setupBodies() {
+        width = canvas.width;
+        height = canvas.height;
+        World.clear(world, false);
+        // 猫画像のサイズ（幅は高さ×アスペクト比）
+        let nekoH = Math.max(200, height*0.28) * nekoScale;
+        let nekoW = nekoH * nekoAspect;
+        // 猫の当たり判定パラメータ（調整用）
+        const catColliderSides = 32; // 多角形の分割数
+        const catColliderRadiusX = nekoW/2 * 0.9; // 横半径（調整可）
+        const catColliderRadiusY = nekoH/2 * 0.8; // 縦半径（調整可）
+        // 楕円多角形の頂点を自作で生成
+        const ellipseVertices = [];
+        for (let i = 0; i < catColliderSides; ++i) {
+          const theta = (2 * Math.PI * i) / catColliderSides;
+          const x = width/2 + catColliderRadiusX * Math.cos(theta);
+          const y = height/2 + catColliderRadiusY * Math.sin(theta);
+          ellipseVertices.push({ x, y });
+        }
+        catCollider = Bodies.fromVertices(width/2, height/2, [ellipseVertices], {
+          isStatic: true, label: 'catCollider'
+        }, true);
+        // catColliderRadiusX, catColliderRadiusYをグローバルにもセット
+        window.catColliderRadiusX = catColliderRadiusX;
+        window.catColliderRadiusY = catColliderRadiusY;
+        // 壁・地面
+        ground = Bodies.rectangle(width/2, height + 1000, width, 2000, { isStatic: true, restitution: 0.2, label: 'ground' });
+        const wallThickness = 100;
+        const leftWall = Bodies.rectangle(-wallThickness/2, height/2, wallThickness, height*2, { isStatic: true, restitution: 0.2, label: 'leftWall' });
+        const rightWall = Bodies.rectangle(width + wallThickness/2, height/2, wallThickness, height*2, { isStatic: true, restitution: 0.2, label: 'rightWall' });
+        // Worldに追加（猫画像は物理ボディにしない！）
+        World.add(world, [ground, leftWall, rightWall, catCollider]);
+        // allNyansに入っている全てのにゃーんをWorldに追加
+        if (window.allNyans && window.allNyans.length > 0) {
+          const nyansToAdd = window.allNyans.filter(n => !!n.position);
+          World.add(world, nyansToAdd);
+        }
+      }
+
+      // 新しいにゃーんを生成して追加する関数
+      function addNyan() {
+        const nyanColors = ['#ff66cc', '#66ccff', '#ffd700', '#ff9966', '#90ee90', '#ff4444', '#a066ff'];
+        const nyanColor = nyanColors[Math.floor(Math.random()*nyanColors.length)];
+        // ランダムな高さ・スケールを決める
+        const nyanH = Math.floor(Math.random() * (120 - 60 + 1)) + 60;
+        const scale = nyanH / 80;
+        // 実際の描画幅を計測
+        const tmpCanvas = document.createElement('canvas');
+        const tmpCtx = tmpCanvas.getContext('2d');
+        tmpCtx.font = `bold ${72 * scale}px 'M PLUS Rounded 1c', sans-serif`;
+        const metrics = tmpCtx.measureText('にゃーん');
+        // フォントによっては実際の高さはmetrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent
+        const nyanW = metrics.width;
+        // 横幅に応じてランダムなX座標
+        const nyanX = Math.random() * (canvas.width - nyanW) + nyanW/2;
+        // restitution: 反発係数, customGravity: 個別重力倍率
+        const nyanRestitution = 0.5 + Math.random() * 0.7; // 0.5〜1.2
+        const nyanGravity = 0.7 + Math.random() * 1.2;     // 0.7〜1.9
+        // 物理ボディも実際の描画サイズで生成
+        const nyan = Bodies.rectangle(nyanX, -nyanH/2, nyanW, nyanH, {
+          restitution: nyanRestitution,
+          label: 'nyan',
+        });
+        nyan.customGravity = nyanGravity;
+        nyan.nyanColor = nyanColor;
+        nyan.nyanW = nyanW;
+        nyan.nyanH = nyanH;
+        if (!window.allNyans) window.allNyans = [];
+        window.allNyans.push(nyan);
+        setupBodies();
+      }
+
+      // 自動でにゃーんを落とす管理用
+      let lastAutoNyanTime = Date.now();
+      let autoNyanInterval = setInterval(() => {
+        if (!window.allNyans) window.allNyans = [];
+        const now = Date.now();
+        if (window.allNyans.length < 100 && now - lastAutoNyanTime >= 1000) {
+          addNyan();
+          lastAutoNyanTime = now;
+        }
+      }, 200);
+      // クリックでにゃーん追加
+      window.addEventListener('click', (e) => {
+        // 右クリックは全消去なので無視
+        if (e.button === 2) return;
+        addNyan();
+        lastAutoNyanTime = Date.now(); // 手動追加でもリセット
+      });
+      // スペースキーでにゃーん追加
+      window.addEventListener('keydown', (e) => {
+        if (e.key === ' ' || e.key === 'Spacebar') {
+          addNyan();
+          lastAutoNyanTime = Date.now(); // 手動追加でもリセット
+        }
+      });
+      // ESC・右クリックで全消去
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (window.allNyans) {
+            for (const n of window.allNyans) {
+              if (n && n.position) Matter.World.remove(engine.world, n);
+            }
+            window.allNyans = [];
+            setupBodies();
+          }
+        }
+      });
+      window.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (window.allNyans) {
+          for (const n of window.allNyans) {
+            if (n && n.position) Matter.World.remove(engine.world, n);
+          }
+          window.allNyans = [];
+          setupBodies();
+        }
+      });
+      setupBodies();
+
+      // レンダリング
+      const ctx = canvas.getContext('2d');
+      const nekoImg = new window.Image();
+      nekoImg.src = 'neko.png';
+
+      nekoImg.onload = function() {
+        nekoAspect = nekoImg.naturalWidth / nekoImg.naturalHeight;
+        nekoImgLoaded = true;
+        setupBodies(); // 画像ロード後に再配置
+      };
+      function render() {
+        // にゃーんの数に応じて背景を赤くする（0:白〜200:真っ赤）
+        let nyanCount = (window.allNyans && window.allNyans.length) ? window.allNyans.length : 0;
+        // 0個:白 (255,255,255) ～ 50個:真っ赤 (255,0,0)
+        let red = Math.min(255, Math.floor(255 * Math.min(nyanCount/50, 1)));
+        let green = 255 - red;
+        let blue = 255 - red;
+        ctx.fillStyle = `rgb(${255},${green},${blue})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // 過去のnyanも全部描画
+        if (window.allNyans && window.allNyans.length > 0) {
+          for (const oldNyan of window.allNyans) {
+            if (!oldNyan.position) continue;
+            ctx.save();
+            ctx.translate(oldNyan.position.x, oldNyan.position.y);
+            ctx.rotate(oldNyan.angle);
+            // 大きさランダム対応
+            const scale = (oldNyan.nyanH || 80) / 80;
+            ctx.font = `bold ${72 * scale}px 'M PLUS Rounded 1c', sans-serif`;
+            ctx.fillStyle = oldNyan.nyanColor || '#ff66cc';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowColor = '#fff';
+            ctx.shadowBlur = 12;
+            ctx.fillText('にゃーん', 0, 0);
+            ctx.shadowBlur = 0;
+            ctx.restore();
+          }
+        }
+        // 物理オブジェクトが未初期化なら何もしない（nekoは不要）
+        if (!nekoImgLoaded || !ground) return;
+        // 個別重力を毎フレーム適用
+        applyCustomGravity();
+        // ねこ（アスペクト比維持＆中央）
+        ctx.save();
+        // 猫画像はcanvas中央に表示（物理ボディに依存しない）
+        let nekoDrawH = Math.max(200, canvas.height*0.28) * nekoScale;
+        let nekoDrawW = nekoDrawH * (nekoImg.naturalWidth / nekoImg.naturalHeight);
+        ctx.translate(canvas.width/2, canvas.height/2);
+        ctx.drawImage(
+          nekoImg,
+          -nekoDrawW/2,
+          -nekoDrawH/2,
+          nekoDrawW,
+          nekoDrawH
+        );
+        ctx.restore();
+        // デバッグ用: 猫の当たり判定（青ポリゴン/楕円）を描画
+        if (window.showColliderDebug && catCollider) {
+          ctx.save();
+          ctx.globalAlpha = 0.28;
+          ctx.strokeStyle = '#0099ff';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          if (catCollider.vertices && catCollider.vertices.length > 2) {
+            // ポリゴン輪郭を描画
+            ctx.moveTo(catCollider.vertices[0].x, catCollider.vertices[0].y);
+            for (let i = 1; i < catCollider.vertices.length; ++i) {
+              ctx.lineTo(catCollider.vertices[i].x, catCollider.vertices[i].y);
+            }
+            ctx.closePath();
+          } else if (catCollider.position && catColliderRadiusX && catColliderRadiusY) {
+            // 楕円fallback
+            ctx.ellipse(catCollider.position.x, catCollider.position.y, catColliderRadiusX, catColliderRadiusY, 0, 0, Math.PI * 2);
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
+        // デバッグ用: 全てのにゃーんの当たり判定を半透明で描画
+        if (window.showColliderDebug && window.allNyans && window.allNyans.length > 0) {
+          ctx.save();
+          ctx.globalAlpha = 0.18;
+          ctx.strokeStyle = '#0099ff';
+          ctx.lineWidth = 2;
+          for (const n of window.allNyans) {
+            if (!n.position || !n.vertices) continue;
+            ctx.beginPath();
+            ctx.moveTo(n.vertices[0].x, n.vertices[0].y);
+            for (let i = 1; i < n.vertices.length; ++i) {
+              ctx.lineTo(n.vertices[i].x, n.vertices[i].y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+        // デバッグ用: （従来の）最新のにゃーんの判定矩形
+        if (nyan) {
+          ctx.save();
+          ctx.globalAlpha = 0.20;
+          ctx.strokeStyle = '#0099ff';
+          ctx.lineWidth = 3;
+          ctx.translate(nyan.position.x, nyan.position.y);
+          ctx.rotate(nyan.angle);
+          const w = nyan.bounds.max.x - nyan.bounds.min.x;
+          const h = nyan.bounds.max.y - nyan.bounds.min.y;
+          ctx.strokeRect(-w/2, -h/2, w, h);
+          ctx.restore();
+        }
+      }
+      Events.on(engine, 'afterUpdate', render);
+
+      // アニメーションループ
+      Runner.run(engine);
+      // 最初の描画
+      render();
+
+      // 再スタート処理
+      function restart() {
+        // 再スタートしてもallNyansは消さずに維持
+        setupBodies();
+      }
+      window.addEventListener('keydown', restart);
+      window.addEventListener('pointerdown', restart);
+      // ESCキーまたは右クリックでにゃーん全消去
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (window.allNyans) {
+            // Worldからも削除
+            for (const n of window.allNyans) {
+              if (n && n.position) Matter.World.remove(engine.world, n);
+            }
+            window.allNyans = [];
+            // 直後のsetupBodiesでnyanが1つ生成されるのを防ぐため、
+            // setupBodies内でallNyans.length===0ならnyan生成をスキップする
+          }
+        }
+      });
+      window.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (window.allNyans) {
+          for (const n of window.allNyans) {
+            if (n && n.position) Matter.World.remove(engine.world, n);
+          }
+          window.allNyans = [];
+        }
+      });
     }
-    window.addEventListener('DOMContentLoaded', function() {
-      startNyanAnimation();
-      window.addEventListener('keydown', function() {
-        startNyanAnimation();
-      });
-      window.addEventListener('pointerdown', function() {
-        startNyanAnimation();
-      });
-    });
+    window.addEventListener('DOMContentLoaded', startPhysics);
   </script>
   <div class="footer-nyas" id="footer-nyas">NyaaS - にゃーん as a Service</div>
 </body>
