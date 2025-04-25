@@ -129,8 +129,46 @@
     const { Engine, Render, Runner, World, Bodies, Body, Events } = window.Matter;
 
     function startPhysics() {
+      // --- スワイプ検出用変数 ---
+      let touchStartY = null;
+      let touchStartX = null;
+      let touchStartTime = null;
+      const SWIPE_THRESHOLD = 60; // px
+      const SWIPE_TIME = 500; // ms
 
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       const canvas = document.getElementById('nyan-canvas');
+      
+      if (isMobile && canvas) {
+        canvas.addEventListener('touchstart', function(e) {
+          if (e.touches.length === 1) {
+            touchStartY = e.touches[0].clientY;
+            touchStartX = e.touches[0].clientX;
+            touchStartTime = Date.now();
+          }
+        });
+        canvas.addEventListener('touchend', function(e) {
+          if (touchStartY === null || touchStartX === null) return;
+          const touch = e.changedTouches[0];
+          const deltaY = touch.clientY - touchStartY;
+          const deltaX = touch.clientX - touchStartX;
+          const deltaTime = Date.now() - touchStartTime;
+          // 縦方向のスワイプのみ検出
+          if (Math.abs(deltaY) > Math.abs(deltaX) && deltaTime < SWIPE_TIME) {
+            if (deltaY > SWIPE_THRESHOLD) {
+              // スワイプ下: 暴れ猫モード
+              if (typeof triggerWildCatMode === 'function') triggerWildCatMode();
+            } else if (deltaY < -SWIPE_THRESHOLD) {
+              // スワイプ上: 通常猫モード（再スタート）
+              if (typeof triggerNormalCatMode === 'function') triggerNormalCatMode();
+            }
+          }
+          touchStartY = null;
+          touchStartX = null;
+          touchStartTime = null;
+        });
+      }
+
       // ここでまとめて宣言
       let nekoAspect = 1.5;
       let nekoImgLoaded = false;
@@ -189,12 +227,17 @@
         const prevVel = catCollider?.velocity ? { x: catCollider.velocity.x, y: catCollider.velocity.y } : null;
         World.clear(world, false);
         // 猫画像のサイズ（幅は高さ×アスペクト比）
-        let nekoH = Math.max(200, height*0.28) * nekoScale;
-        let nekoW = nekoH * nekoAspect;
+        // グローバル変数にしてrender()からも参照できるように
+        window.nekoH = (typeof isMobile !== 'undefined' && isMobile)
+          ? Math.min(Math.max(140, height * 0.18) * nekoScale, (width * 0.80) / nekoAspect)
+          : Math.max(200, height * 0.28) * nekoScale;
+        window.nekoW = window.nekoH * nekoAspect;
+        let nekoH = window.nekoH;
+        let nekoW = window.nekoW;
         // 猫の当たり判定パラメータ（調整用）
         const catColliderSides = 32; // 多角形の分割数
-        const catColliderRadiusX = nekoW/2 * 0.9; // 横半径（調整可）
-        const catColliderRadiusY = nekoH/2 * 0.8; // 縦半径（調整可）
+        const catColliderRadiusX = nekoW/2 * 1.0; // 横半径（画像とピッタリ）
+        const catColliderRadiusY = nekoH/2 * 1.0; // 縦半径（画像とピッタリ）
         // 楕円多角形の頂点を自作で生成
         const ellipseVertices = [];
         for (let i = 0; i < catColliderSides; ++i) {
@@ -245,6 +288,7 @@
       }
       function resetCatMode() {
         window.catIsWild = false;
+        window.allNyans = [];
         setupBodies();
         // 猫を中央に戻して完全停止
         if (catCollider) {
@@ -260,6 +304,10 @@
       // --- 共通: 通常猫モード（再スタート） ---
       function triggerNormalCatMode() {
         resetCatMode();
+      }
+      // --- 共通: 暴れ猫モード切り替え ---
+      function triggerWildCatMode() {
+        unleashCat();
       }
 
       window.addEventListener('keydown', (e) => {
@@ -414,8 +462,9 @@
         applyCustomGravity();
         // ねこ（物理ボディcatColliderに追従して描画）
         ctx.save();
-        let nekoDrawH = Math.max(200, canvas.height*0.28) * nekoScale;
-        let nekoDrawW = nekoDrawH * (nekoImg.naturalWidth / nekoImg.naturalHeight);
+        // setupBodies()で決定したwindow.nekoH, window.nekoWを使って画像を描画
+        let nekoDrawH = (typeof window.nekoH !== 'undefined') ? window.nekoH : Math.max(200, canvas.height*0.28) * nekoScale;
+        let nekoDrawW = (typeof window.nekoW !== 'undefined') ? window.nekoW : nekoDrawH * (nekoImg.naturalWidth / nekoImg.naturalHeight);
         if (catCollider && catCollider.position) {
           ctx.drawImage(
             nekoImg,
