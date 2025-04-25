@@ -227,12 +227,17 @@
         const prevVel = catCollider?.velocity ? { x: catCollider.velocity.x, y: catCollider.velocity.y } : null;
         World.clear(world, false);
         // 猫画像のサイズ（幅は高さ×アスペクト比）
-        let nekoH = Math.max(200, height*0.28) * nekoScale;
-        let nekoW = nekoH * nekoAspect;
+        // グローバル変数にしてrender()からも参照できるように
+        window.nekoH = (typeof isMobile !== 'undefined' && isMobile)
+          ? Math.min(Math.max(140, height * 0.18) * nekoScale, (width * 0.80) / nekoAspect)
+          : Math.max(200, height * 0.28) * nekoScale;
+        window.nekoW = window.nekoH * nekoAspect;
+        let nekoH = window.nekoH;
+        let nekoW = window.nekoW;
         // 猫の当たり判定パラメータ（調整用）
         const catColliderSides = 32; // 多角形の分割数
-        const catColliderRadiusX = nekoW/2 * 0.9; // 横半径（調整可）
-        const catColliderRadiusY = nekoH/2 * 0.8; // 縦半径（調整可）
+        const catColliderRadiusX = nekoW/2 * 1.0; // 横半径（画像とピッタリ）
+        const catColliderRadiusY = nekoH/2 * 1.0; // 縦半径（画像とピッタリ）
         // 楕円多角形の頂点を自作で生成
         const ellipseVertices = [];
         for (let i = 0; i < catColliderSides; ++i) {
@@ -457,8 +462,9 @@
         applyCustomGravity();
         // ねこ（物理ボディcatColliderに追従して描画）
         ctx.save();
-        let nekoDrawH = Math.max(200, canvas.height*0.28) * nekoScale;
-        let nekoDrawW = nekoDrawH * (nekoImg.naturalWidth / nekoImg.naturalHeight);
+        // setupBodies()で決定したwindow.nekoH, window.nekoWを使って画像を描画
+        let nekoDrawH = (typeof window.nekoH !== 'undefined') ? window.nekoH : Math.max(200, canvas.height*0.28) * nekoScale;
+        let nekoDrawW = (typeof window.nekoW !== 'undefined') ? window.nekoW : nekoDrawH * (nekoImg.naturalWidth / nekoImg.naturalHeight);
         if (catCollider && catCollider.position) {
           ctx.drawImage(
             nekoImg,
