@@ -129,8 +129,46 @@
     const { Engine, Render, Runner, World, Bodies, Body, Events } = window.Matter;
 
     function startPhysics() {
+      // --- スワイプ検出用変数 ---
+      let touchStartY = null;
+      let touchStartX = null;
+      let touchStartTime = null;
+      const SWIPE_THRESHOLD = 60; // px
+      const SWIPE_TIME = 500; // ms
 
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       const canvas = document.getElementById('nyan-canvas');
+      
+      if (isMobile && canvas) {
+        canvas.addEventListener('touchstart', function(e) {
+          if (e.touches.length === 1) {
+            touchStartY = e.touches[0].clientY;
+            touchStartX = e.touches[0].clientX;
+            touchStartTime = Date.now();
+          }
+        });
+        canvas.addEventListener('touchend', function(e) {
+          if (touchStartY === null || touchStartX === null) return;
+          const touch = e.changedTouches[0];
+          const deltaY = touch.clientY - touchStartY;
+          const deltaX = touch.clientX - touchStartX;
+          const deltaTime = Date.now() - touchStartTime;
+          // 縦方向のスワイプのみ検出
+          if (Math.abs(deltaY) > Math.abs(deltaX) && deltaTime < SWIPE_TIME) {
+            if (deltaY > SWIPE_THRESHOLD) {
+              // スワイプ下: 暴れ猫モード
+              if (typeof triggerWildCatMode === 'function') triggerWildCatMode();
+            } else if (deltaY < -SWIPE_THRESHOLD) {
+              // スワイプ上: 通常猫モード（再スタート）
+              if (typeof triggerNormalCatMode === 'function') triggerNormalCatMode();
+            }
+          }
+          touchStartY = null;
+          touchStartX = null;
+          touchStartTime = null;
+        });
+      }
+
       // ここでまとめて宣言
       let nekoAspect = 1.5;
       let nekoImgLoaded = false;
@@ -245,6 +283,7 @@
       }
       function resetCatMode() {
         window.catIsWild = false;
+        window.allNyans = [];
         setupBodies();
         // 猫を中央に戻して完全停止
         if (catCollider) {
@@ -260,6 +299,10 @@
       // --- 共通: 通常猫モード（再スタート） ---
       function triggerNormalCatMode() {
         resetCatMode();
+      }
+      // --- 共通: 暴れ猫モード切り替え ---
+      function triggerWildCatMode() {
+        unleashCat();
       }
 
       window.addEventListener('keydown', (e) => {
