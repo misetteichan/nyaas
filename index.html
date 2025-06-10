@@ -5,6 +5,12 @@
   <script src="https://cdn.jsdelivr.net/npm/matter-js@0.19.0/build/matter.min.js"></script>
   <meta charset="UTF-8">
   <title>NyaaS</title>
+  <!-- Twitter Card / OGP -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta property="og:url" content="https://misetteichan.github.io/nyaas/">
+  <meta property="og:title" content="NyaaS">
+  <meta property="og:description" content="にゃーん as a Service だよ。にゃーんな時にぜひ！">
+  <meta property="og:image" content="https://misetteichan.github.io/nyaas/images/card.png">
   <style>
     body {
       height: 100vh;
@@ -567,6 +573,93 @@
       });
     }
     window.addEventListener('DOMContentLoaded', startPhysics);
+  </script>
+  <!-- 操作マニュアル モーダル -->
+  <style>
+    .manual-modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      min-width: 320px;
+      max-width: 420px;
+      width: 90vw;
+      padding: 32px 36px;
+      background: rgba(120, 120, 120, 0.85);
+      border-radius: 28px;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.18);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      color: #fff;
+      font-family: 'M PLUS Rounded 1c', 'Kosugi Maru', 'Noto Sans JP', 'Yu Gothic', sans-serif;
+      opacity: 0;
+      pointer-events: auto;
+      transition: opacity 0.6s cubic-bezier(.4,0,.2,1);
+    }
+    .manual-modal.show { opacity: 1; }
+    .manual-modal.hide { opacity: 0; pointer-events: none; }
+    @media (max-width: 600px) {
+      .manual-modal-title { font-size: 1.2em !important; }
+    }
+  </style>
+  <div id="manualModal" class="manual-modal">
+    <div class="manual-modal-title" style="font-size:1.5em;font-weight:bold;text-align:center;line-height:1.2;margin-bottom:0.7em;">
+      NyaaS<br><span style="font-size:0.85em;">-にゃーん as a Service-</span>
+    </div>
+    <div style="text-align:left;max-width:380px;">
+      <ul style="margin:0;padding-left:1.2em;">
+        <li>クリック/タップ：にゃーん</li>
+        <li>ESC/上フリック：リスタート</li>
+        <li>ENTER/下フリック：ねこ自由</li>
+        <li>Hキー：ヘルプを表示</li>
+      </ul>
+    </div>
+  </div>
+  <script>
+    window.addEventListener('DOMContentLoaded', function() {
+      const modal = document.getElementById('manualModal');
+      let closed = false;
+      setTimeout(() => { modal.classList.add('show'); }, 50);
+
+      function showModal() {
+        closed = false;
+        modal.style.display = '';
+        modal.classList.remove('hide');
+        setTimeout(() => { modal.classList.add('show'); }, 10);
+      }
+
+      function hideModal() {
+        if (closed) return;
+        closed = true;
+        modal.classList.remove('show');
+        modal.classList.add('hide');
+        setTimeout(() => { modal.style.display = 'none'; }, 700);
+      }
+
+      // ヘルプ表示のキーハンドラ（Hキー）
+      window.addEventListener('keydown', function(e) {
+        if (e.key.toLowerCase() === 'h') {
+          showModal();
+          // 3秒後に自動で閉じる
+          setTimeout(hideModal, 3000);
+        }
+      });
+
+      // 初期表示時のイベント
+      window.addEventListener('mousedown', hideModal, { once: true });
+      window.addEventListener('touchstart', hideModal, { once: true });
+      window.addEventListener('keydown', function(e) {
+        if (e.key.toLowerCase() !== 'h') {
+          hideModal();
+        }
+      }, { once: true });
+      
+      setTimeout(hideModal, 3000);
+    });
   </script>
   <div class="footer-nyas" id="footer-nyas">NyaaS - にゃーん as a Service</div>
 </body>
